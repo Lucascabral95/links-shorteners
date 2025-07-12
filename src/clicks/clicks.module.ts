@@ -1,0 +1,11 @@
+import { Module } from '@nestjs/common';
+import { ClicksService } from './clicks.service';
+import { ClicksController } from './clicks.controller';
+import { UsersService } from 'src/users/users.service';
+import { LinksService } from 'src/links/links.service';
+
+@Module({
+  controllers: [ClicksController],
+  providers: [ClicksService, UsersService, LinksService],
+})
+export class ClicksModule { }

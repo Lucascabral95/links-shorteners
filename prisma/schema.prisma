@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id String @id @default(cuid())
+  email String @unique
+  password String?
+  full_name String 
+  role Role @default(FREE)
+  verified Boolean @default(false)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  googleId String?
+  picture String?
+  provider String @default("email")
+
+  links Link[]
+  clicks Click[]
+  passwordResetToken PasswordResetToken[]
+}
+
+model Link {
+  id String @id @default(cuid())
+  originalUrl String 
+  shortCode String @unique
+  customAlias String? @unique
+  title String? 
+  description String?
+  password String?
+  expiresAt DateTime?
+  isActive Boolean @default(true)
+  isPublic Boolean @default(true)
+  category String? 
+
+  userId String 
+  user User @relation(fields: [userId], references: [id])
+  clicks Click[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model Click {
+  id String @id @default(cuid())
+  linkId String 
+  userId String?
+  ipAddress String
+  userAgent String 
+  country String?
+  city String?
+  device String? 
+  browser String?
+  
+  link Link @relation(fields: [linkId], references: [id])
+  user User? @relation(fields: [userId], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+// Change password 
+model PasswordResetToken {
+  id String @id @default(cuid())
+  token String @unique
+  userId String 
+  user User @relation(fields: [userId], references: [id])
+  expiresAt DateTime
+  used Boolean @default(false)
+
+  created_at DateTime @default(now())
+}
+
+enum Role {
+  ADMIN
+  PREMIUM
+  FREE 
+  GUEST
+}
