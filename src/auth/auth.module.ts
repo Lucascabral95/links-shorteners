@@ -6,10 +6,15 @@ import { envs } from 'src/config/envs';
 import { UsersModule } from 'src/users/users.module';
 import { EmailService } from './email.service';
 import { UsersService } from 'src/users/users.service';
+import { GoogleStrategy } from './strategies/google.strategy';
 
 @Module({
   controllers: [AuthController],
-  providers: [AuthService, EmailService, UsersService],
+  providers: [
+    AuthService,
+    EmailService,
+    UsersService,
+    GoogleStrategy],
   imports: [
     JwtModule.register({
       global: true,

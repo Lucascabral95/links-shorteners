@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
-import { CreateClickDto, UpdateClickDto } from './dto';
+import { CreateClickDto, PaginationClickDto, UpdateClickDto, WhereClicksDto } from './dto';
 import { PrismaClient } from 'generated/prisma';
 import { handlePrismaError } from 'src/utils/prisma-error-handler';
 import { LinksService } from 'src/links/links.service';
@@ -7,6 +7,9 @@ import { UsersService } from 'src/users/users.service';
 import { Request } from 'express';
 import { UAParser } from 'ua-parser-js';
 import axios from 'axios';
+import { envs } from 'src/config/envs';
+
+const LINKS_FILTER_QUANTITY = envs.linksFilterQuantity;
 
 @Injectable()
 export class ClicksService extends PrismaClient implements OnModuleInit {
@@ -22,42 +25,96 @@ export class ClicksService extends PrismaClient implements OnModuleInit {
     this.logger.log('ClicksService initialized');
   }
 
-  async findAll() {
+  async findAll(paginationClickDto: PaginationClickDto) {
     try {
-      const allClicks = await this.click.findMany({
-        include: {
-          link: {
-            select: {
-              id: true,
-              shortCode: true,
-              originalUrl: true,
-              title: true,
-              description: true,
-              expiresAt: true,
-              isActive: true,
-              isPublic: true,
-              category: true,
-              created_at: true,
-              updated_at: true,
-              userId: true,
-            }
-          },
-          user: {
-            select: {
-              id: true,
-              full_name: true,
-              email: true,
-            }
-          }
-        }
-      });
+      const { page = 1, limit = LINKS_FILTER_QUANTITY, country, city, device, browser, userId } = paginationClickDto;
 
-      if (!allClicks) {
-        throw new NotFoundException('Clicks not found');
+      const where: WhereClicksDto = {};
+
+      if (country) {
+        where.country = {
+          contains: country,
+          mode: 'insensitive',
+        };
       }
 
-      return allClicks;
+      if (city) {
+        where.city = {
+          contains: city,
+          mode: 'insensitive',
+        };
+      }
+
+      if (device) {
+        where.device = {
+          contains: device,
+          mode: 'insensitive',
+        };
+      }
+
+      if (browser) {
+        where.browser = {
+          contains: browser,
+          mode: 'insensitive',
+        };
+      }
+
+      if (userId) {
+        where.userId = userId;
+      }
+
+      const [totalClicks, clicks] = await Promise.all([
+        this.click.count({ where }),
+        this.click.findMany({
+          where,
+          take: limit,
+          skip: (page - 1) * limit,
+          orderBy: {
+            created_at: 'desc'
+          },
+          include: {
+            link: {
+              select: {
+                id: true,
+                shortCode: true,
+                originalUrl: true,
+                title: true,
+                description: true,
+                expiresAt: true,
+                isActive: true,
+                isPublic: true,
+                category: true,
+                created_at: true,
+                updated_at: true,
+                userId: true,
+              }
+            },
+            user: {
+              select: {
+                id: true,
+                full_name: true,
+                email: true,
+              }
+            }
+          }
+        })
+      ])
+
+      const totalPages = Math.ceil(totalClicks / limit);
+
+      return {
+        quantityClicks: totalClicks,
+        totalPages: totalPages,
+        currentPage: page,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+        clicks: clicks,
+      };
+
     } catch (error) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
       return handlePrismaError(error, 'Click');
     }
   }

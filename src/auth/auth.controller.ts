@@ -1,6 +1,6 @@
-import { Controller, Post, Body, UseGuards, Req, Res } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Req, Res, Get } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { RegisterAuthDto, LoginAuthDto, PasswordResetRequestDto, PasswordResetConfirmDto, ResponseLoginGoogleDto } from './dto';
+import { RegisterAuthDto, LoginAuthDto, PasswordResetRequestDto, PasswordResetConfirmDto } from './dto';
 import { GoogleOAuthGuard } from './guards/google-guard.guard';
 import { envs } from 'src/config/envs';
 import { ApiTags, ApiResponse, ApiOperation } from '@nestjs/swagger';
@@ -11,7 +11,8 @@ import { ResponseLoginAuthDto } from './dto/response-login-auth.dto';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(private readonly authService: AuthService
+  ) { }
 
   @Post('register')
   @ApiOperation({
@@ -64,38 +65,32 @@ export class AuthController {
     return this.authService.confirmPassword(passwordResetConfirmDto);
   }
 
-  // Auth with Google
-  @Post('google')
-  @ApiOperation({
-    summary: 'Auth with Google',
-    description: 'Auth with Google. Retorned message: User logged in successfully with token JWT with user data.'
-  })
-  @ApiResponse({ status: 201, type: ResponseLoginGoogleDto })
-  @ApiResponse({ status: 500, type: "Internal Server Error" })
-  @ApiResponse({ status: 400, type: "No Google user data was received" })
+  @Get('google')
   @UseGuards(GoogleOAuthGuard)
   async googleLogin(@Req() req) {
   }
 
-  @Post('google/callback')
-  @ApiOperation({
-    summary: 'Auth with Google callback',
-    description: 'Auth with Google callback. Retorned message: User logged in successfully with token JWT with user data.'
-  })
+  @Get('google/callback')
   @UseGuards(GoogleOAuthGuard)
-  @ApiResponse({ status: 201, type: ResponseLoginGoogleDto })
-  @ApiResponse({ status: 500, type: "Internal Server Error" })
-  @ApiResponse({ status: 400, type: "No Google user data was received" })
   googleCallback(@Req() req, @Res() res) {
     try {
       if (!req.user) {
         throw new BadRequestException('No Google user data was received');
       }
 
-      return res.redirect(envs.loginSessionCallback);
+      console.log(req.user.token)
+
+      const token = req.user.token;
+      const successUrl = envs.frontendSuccessUrl;
+      const errorUrl = envs.frontendErrorUrl;
+
+      if (!token) {
+        return res.redirect(errorUrl);
+      }
+
+      return res.redirect(`${successUrl}?token=${token}`);
     } catch (error) {
       console.error('Error in googleCallback:', error);
-
       return res.redirect(envs.loginSessionFailed);
     }
   }

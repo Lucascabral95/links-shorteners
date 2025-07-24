@@ -1,9 +1,11 @@
 import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from 'generated/prisma';
 import { Logger } from '@nestjs/common';
-import { Period, QueryFilterAnalyticsTimeSeriesDto, QueryFilterAnalyticsTopLinksDto } from './dto';
+import { Period, QueryFilterAnalyticsTimeSeriesDto, QueryFilterAnalyticsTopLinksDto, TypePeriod } from './dto';
 import { handlePrismaError } from 'src/utils/prisma-error-handler';
 import { envs } from 'src/config/envs';
+
+const LINKS_FILTER_QUANTITY = envs.linksFilterQuantity;
 
 @Injectable()
 export class AnalyticsService extends PrismaClient implements OnModuleInit {
@@ -71,38 +73,55 @@ export class AnalyticsService extends PrismaClient implements OnModuleInit {
   }
 
   async getTopLinks(query: QueryFilterAnalyticsTopLinksDto) {
-    const { limit, page, period } = query;
-    const skip = (page - 1) * limit
+    const { limit = 10000, page = 1, period = Period['30d'] } = query;
+    const skip = (page - 1) * limit;
 
     const switchHours = (period: Period) => {
       switch (period) {
         case Period['1h']:
-          return 1
+          return 1;
         case Period['12h']:
-          return 12
+          return 12;
         case Period['24h']:
-          return 24
+          return 24;
         case Period['7d']:
-          return 7 * 24
+          return 7 * 24;
         case Period['30d']:
-          return 30 * 24
+          return 30 * 24;
         case Period['90d']:
-          return 90 * 24
+          return 90 * 24;
         case Period['1y']:
-          return 365 * 24
+          return 365 * 24;
         default:
-          return 24
+          return 24;
       }
-    }
+    };
 
     try {
-      const topLinks = await this.click.groupBy({
+      const dateFilter = new Date(Date.now() - switchHours(period) * 60 * 60 * 1000);
+
+      const totalUniqueLinks = await this.click.groupBy({
         where: {
           created_at: {
-            gte: new Date(Date.now() - switchHours(period) * 60 * 60 * 1000),
+            gte: dateFilter,
           }
         },
-        by: ['linkId', 'userId', 'created_at', 'updated_at'],
+        by: ['linkId'],
+        _count: {
+          linkId: true
+        }
+      });
+
+      const totalTopLinks = totalUniqueLinks.length;
+      const totalPages = Math.ceil(totalTopLinks / limit);
+
+      const topLinksData = await this.click.groupBy({
+        where: {
+          created_at: {
+            gte: dateFilter,
+          }
+        },
+        by: ['linkId'],
         _count: {
           linkId: true
         },
@@ -113,17 +132,47 @@ export class AnalyticsService extends PrismaClient implements OnModuleInit {
         },
         take: limit,
         skip: skip
-      })
+      });
 
-      const quantityLinks = topLinks.length
-      const totalPages = Math.ceil(quantityLinks / limit)
+      const linkIds = topLinksData.map(item => item.linkId);
+
+      const linksWithDetails = await this.link.findMany({
+        where: {
+          id: { in: linkIds }
+        },
+        select: {
+          id: true,
+          originalUrl: true,
+          shortCode: true,
+          customAlias: true,
+          title: true,
+          description: true,
+          isActive: true,
+          isPublic: true,
+          category: true,
+          created_at: true,
+          updated_at: true,
+          userId: true
+        }
+      });
+
+      const topLinks = topLinksData.map(clickData => {
+        const linkDetail = linksWithDetails.find(link => link.id === clickData.linkId);
+        return {
+          ...linkDetail,
+          clicksCount: clickData._count.linkId
+        };
+      }).filter(link => link.id);
 
       return {
-        quantityLinks: quantityLinks,
+        quantityLinks: totalTopLinks,
         totalPages: totalPages,
         currentPage: page,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
         topLinks: topLinks,
-      }
+      };
+
     } catch (error) {
       if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof InternalServerErrorException) {
         throw error;
@@ -134,89 +183,190 @@ export class AnalyticsService extends PrismaClient implements OnModuleInit {
 
   async getGeographic() {
     try {
-      const geographic = await this.click.groupBy({
-        by: ['country', 'city', 'device', 'browser'],
-        _count: {
-          country: true,
-        },
-        orderBy: {
-          _count: {
-            country: 'desc'
-          }
-        },
-        take: envs.linksFilterQuantity
-      })
+      const [countryData, cityData, deviceData, browserData, totalClicks] = await Promise.all([
+        this.click.groupBy({
+          by: ['country'],
+          _count: { _all: true },
+          where: { country: { not: null } },
+          orderBy: { _count: { country: 'desc' } },
+        }),
 
-      return geographic
+        this.click.groupBy({
+          by: ['city'],
+          _count: { _all: true },
+          where: { city: { not: null } },
+          orderBy: { _count: { city: 'desc' } },
+        }),
+
+        this.click.groupBy({
+          by: ['device'],
+          _count: { _all: true },
+          where: { device: { not: null } },
+          orderBy: { _count: { device: 'desc' } }
+        }),
+
+        this.click.groupBy({
+          by: ['browser'],
+          _count: { _all: true },
+          where: { browser: { not: null } },
+          orderBy: { _count: { browser: 'desc' } }
+        }),
+
+        this.click.count()
+      ]);
+
+      const validateValue = (value: string | null): string =>
+        value?.trim() || 'No especificado';
+
+      const countries = countryData.map(item => ({
+        country: item.country,
+        city: null,
+        device: 'aggregated',
+        browser: 'aggregated',
+        _count: {
+          country: item._count._all,
+          city: 0,
+          device: item._count._all,
+          browser: item._count._all
+        }
+      }));
+
+      const cities = cityData.map(item => ({
+        country: null,
+        city: item.city,
+        device: 'aggregated',
+        browser: 'aggregated',
+        _count: {
+          country: 0,
+          city: item._count._all,
+          device: item._count._all,
+          browser: item._count._all
+        }
+      }));
+
+      const devices = deviceData.map(item => ({
+        country: null,
+        city: null,
+        device: validateValue(item.device),
+        browser: 'aggregated',
+        _count: {
+          country: 0,
+          city: 0,
+          device: item._count._all,
+          browser: 0
+        }
+      }));
+
+      const browsers = browserData.map(item => ({
+        country: null,
+        city: null,
+        device: 'aggregated',
+        browser: validateValue(item.browser),
+        _count: {
+          country: 0,
+          city: 0,
+          device: 0,
+          browser: item._count._all
+        }
+      }));
+
+      const totalCountryClicks = countryData.reduce((sum, item) => sum + item._count._all, 0);
+      const totalCityClicks = cityData.reduce((sum, item) => sum + item._count._all, 0);
+      const totalDeviceClicks = deviceData.reduce((sum, item) => sum + item._count._all, 0);
+      const totalBrowserClicks = browserData.reduce((sum, item) => sum + item._count._all, 0);
+
+      return {
+        geographic: countries,
+        countries: countries,
+        cities: cities,
+        devices: devices,
+        browsers: browsers,
+
+        stats: {
+          uniqueCountries: countryData.length,
+          uniqueCities: cityData.length,
+          uniqueDevices: deviceData.length,
+          uniqueBrowsers: browserData.length,
+
+          countryClicks: totalCountryClicks,
+          cityClicks: totalCityClicks,
+          deviceClicks: totalDeviceClicks,
+          browserClicks: totalBrowserClicks,
+
+          totalClicks: totalClicks,
+
+          topCountry: countries[0]?.country || 'N/A',
+          topCity: cities[0]?.city || 'N/A',
+          topDevice: devices[0]?.device || 'N/A',
+          topBrowser: browsers[0]?.browser || 'N/A',
+
+          countryDistribution: countryData.map(item => ({
+            country: item.country,
+            clicks: item._count._all,
+            percentage: ((item._count._all / totalCountryClicks) * 100).toFixed(2)
+          })),
+
+          deviceDistribution: deviceData.map(item => ({
+            device: validateValue(item.device),
+            clicks: item._count._all,
+            percentage: ((item._count._all / totalDeviceClicks) * 100).toFixed(2)
+          })),
+
+          browserDistribution: browserData.map(item => ({
+            browser: validateValue(item.browser),
+            clicks: item._count._all,
+            percentage: ((item._count._all / totalBrowserClicks) * 100).toFixed(2)
+          }))
+        },
+
+        rankings: {
+          topCountries: countryData.slice(0, 10).map((item, index) => ({
+            rank: index + 1,
+            country: item.country,
+            clicks: item._count._all,
+            percentage: ((item._count._all / totalCountryClicks) * 100).toFixed(2)
+          })),
+
+          topCities: cityData.slice(0, 10).map((item, index) => ({
+            rank: index + 1,
+            city: item.city,
+            clicks: item._count._all,
+            percentage: ((item._count._all / totalCityClicks) * 100).toFixed(2)
+          })),
+
+          topDevices: deviceData.slice(0, 5).map((item, index) => ({
+            rank: index + 1,
+            device: validateValue(item.device),
+            clicks: item._count._all,
+            percentage: ((item._count._all / totalDeviceClicks) * 100).toFixed(2)
+          })),
+
+          topBrowsers: browserData.slice(0, 10).map((item, index) => ({
+            rank: index + 1,
+            browser: validateValue(item.browser),
+            clicks: item._count._all,
+            percentage: ((item._count._all / totalBrowserClicks) * 100).toFixed(2)
+          }))
+        },
+
+        metadata: {
+          queryLimit: LINKS_FILTER_QUANTITY,
+          timestamp: new Date().toISOString(),
+          dataIntegrity: {
+            countriesWithoutCities: countryData.length - new Set(cityData.map(c => c.city)).size,
+            citiesWithoutCountry: 0,
+            hasIncompleteData: totalCountryClicks !== totalClicks
+          }
+        }
+      };
+
     } catch (error) {
-      if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof InternalServerErrorException) {
+      if (error instanceof BadRequestException ||
+        error instanceof NotFoundException ||
+        error instanceof InternalServerErrorException) {
         throw error;
       }
       return handlePrismaError(error, 'Geographic', 'getGeographic');
-    }
-  }
-
-  async getDeviceBrowserDistribution() {
-    try {
-      const deviceBrowserDistribution = await this.click.groupBy({
-        by: ['device', 'browser', 'created_at'],
-        _count: {
-          device: true,
-          browser: true,
-        },
-        orderBy: {
-          _count: {
-            device: 'desc'
-          }
-        }
-      });
-
-      const validateValue = (value: string | null) => {
-        return value && typeof value === 'string' && value.trim() !== ''
-          ? value.trim()
-          : 'no especificado';
-      };
-
-      const processedDistribution = deviceBrowserDistribution.map(entry => ({
-        device: validateValue(entry.device),
-        browser: validateValue(entry.browser),
-        created_at: entry.created_at,
-        _count: entry._count
-      }));
-
-      const uniqueDevicesSet = new Set(processedDistribution.map(item => item.device));
-      const uniqueBrowsersSet = new Set(processedDistribution.map(item => item.browser));
-
-      const deviceStats = {
-        totalDevices: uniqueDevicesSet.size,
-        totalBrowsers: uniqueBrowsersSet.size,
-        uniqueDevices: Array.from(uniqueDevicesSet),
-        uniqueBrowsers: Array.from(uniqueBrowsersSet),
-        totalRecords: processedDistribution.length
-      };
-
-      const deviceTotals = processedDistribution.reduce((acc, entry) => {
-        const device = entry.device;
-        acc[device] = (acc[device] || 0) + (entry._count.device || 0);
-        return acc;
-      }, {});
-
-      return {
-        // distribution: processedDistribution,
-        deviceStats,
-        deviceTotals,
-        metadata: {
-          queryLimit: 1,
-          recordsReturned: processedDistribution.length,
-          hasMoreData: processedDistribution.length === 1
-        },
-      };
-
-    } catch (error) {
-      if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof InternalServerErrorException) {
-        throw error;
-      }
-      return handlePrismaError(error, 'DeviceBrowserDistribution', 'getDeviceBrowserDistribution');
     }
   }
 
@@ -255,7 +405,7 @@ export class AnalyticsService extends PrismaClient implements OnModuleInit {
   }
 
   async getTimeSeries(query: QueryFilterAnalyticsTimeSeriesDto) {
-    const { page, type, startDate, endDate, limit } = query
+    const { page, type = TypePeriod.daily, startDate, endDate, limit = LINKS_FILTER_QUANTITY } = query
     const skip = (page - 1) * limit
 
     try {
@@ -264,7 +414,7 @@ export class AnalyticsService extends PrismaClient implements OnModuleInit {
           created_at: {
             gte: startDate ? new Date(startDate).toISOString() : undefined,
             lte: endDate ? new Date(endDate).toISOString() : undefined,
-          }
+          },
         },
         take: limit,
         skip: skip,

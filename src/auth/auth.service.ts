@@ -29,7 +29,7 @@ export class AuthService extends PrismaClient implements OnModuleInit {
     });
 
     if (userExists) {
-      throw new BadRequestException('User already exists');
+      throw new BadRequestException('Email already exists');
     }
 
     try {
@@ -211,7 +211,7 @@ export class AuthService extends PrismaClient implements OnModuleInit {
   }
 
   // autenticacion con cuenta de google
-  async validateOrCreateGoogleUser(googleUser: any) {
+  async validateOrCreateGoogleUser(googleUser: LoginGoogleDto) {
     const { email, googleId, full_name, picture } = googleUser;
 
     let user = await this.user.findFirst({
@@ -226,11 +226,14 @@ export class AuthService extends PrismaClient implements OnModuleInit {
     if (user) {
       if (!user.googleId) {
         user = await this.user.update({
-          where: { id: user.id },
+          where: {
+            id: user.id
+          },
           data: {
             googleId: googleId,
             picture: picture || user.picture,
             full_name: full_name || user.full_name,
+            provider: 'google',
           }
         });
       }
@@ -257,6 +260,5 @@ export class AuthService extends PrismaClient implements OnModuleInit {
       access_token: this.jwtService.sign(user),
     };
   }
-
 
 }

@@ -20,6 +20,8 @@ interface EnvVars {
     GOOGLE_SECRET_CLIENT: string,
     LOGIN_SESSION_CALLBACK: string,
     LOGIN_SESSION_FAILED: string,
+    FRONTEND_SUCCESS_URL: string,
+    FRONTEND_ERROR_URL: string,
 }
 
 const envsSchema = joi.object<EnvVars>({
@@ -41,6 +43,8 @@ const envsSchema = joi.object<EnvVars>({
     GOOGLE_SECRET_CLIENT: joi.string().required(),
     LOGIN_SESSION_CALLBACK: joi.string().required(),
     LOGIN_SESSION_FAILED: joi.string().required(),
+    FRONTEND_SUCCESS_URL: joi.string().required(),
+    FRONTEND_ERROR_URL: joi.string().required(),
 }).unknown(true);
 
 const { value, error } = envsSchema.validate({
@@ -70,4 +74,6 @@ export const envs = {
     googleClientSecret: value.GOOGLE_SECRET_CLIENT,
     loginSessionCallback: value.LOGIN_SESSION_CALLBACK,
     loginSessionFailed: value.LOGIN_SESSION_FAILED,
+    frontendSuccessUrl: value.FRONTEND_SUCCESS_URL,
+    frontendErrorUrl: value.FRONTEND_ERROR_URL,
 };

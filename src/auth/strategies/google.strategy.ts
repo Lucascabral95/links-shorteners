@@ -27,7 +27,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
 
         const user = await this.authService.validateOrCreateGoogleUser({
             email: emails[0].value,
-            full_name: name.givenName + name.familyName,
+            full_name: `${name.givenName} ${name.familyName}`,
             picture: photos[0].value,
             googleId: profile.id,
         });

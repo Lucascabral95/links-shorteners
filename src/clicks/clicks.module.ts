@@ -7,5 +7,6 @@ import { LinksService } from 'src/links/links.service';
 @Module({
   controllers: [ClicksController],
   providers: [ClicksService, UsersService, LinksService],
+  exports: [ClicksService],
 })
 export class ClicksModule { }

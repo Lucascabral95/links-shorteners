@@ -19,7 +19,7 @@ export class EmailService {
     }
 
     async sendPasswordResetEmail(email: string, token: string) {
-        const resetUrl = `${envs.frontendUrl}/reset-password?token=${token}`;
+        const resetUrl = `${envs.frontendUrl}/auth/reset/confirm-password?token=${token}`;
 
         const htmlBody = `
     <!DOCTYPE html>

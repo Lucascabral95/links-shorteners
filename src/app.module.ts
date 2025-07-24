@@ -6,12 +6,15 @@ import { UsersModule } from './users/users.module';
 import { LinksModule } from './links/links.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { ClicksModule } from './clicks/clicks.module';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
-  imports: [AuthModule, UsersModule, LinksModule, AnalyticsModule, ClicksModule],
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
+    AuthModule, UsersModule, LinksModule, AnalyticsModule, ClicksModule],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {
-
-}
+export class AppModule { }

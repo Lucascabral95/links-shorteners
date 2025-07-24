@@ -38,9 +38,8 @@ export class UpdateLinkDto {
     password?: string;
 
     @ApiProperty()
-    @IsDate()
     @IsOptional()
-    expiresAt?: Date;
+    expiresAt?: Date | null | string;
 
     @ApiProperty()
     @IsBoolean()

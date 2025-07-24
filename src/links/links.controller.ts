@@ -3,7 +3,9 @@ import { LinksService } from './links.service';
 import { CreateLinkDto } from './dto/create-link.dto';
 import { UpdateLinkDto } from './dto/update-link.dto';
 import { ApiTags, ApiResponse, ApiOperation } from '@nestjs/swagger';
-import { GetLinksDto, ResponseCreateLinkDto, ResponseUpdateLinkDto } from './dto';
+import { GetLinksDto, GetLinkStatsResponseDto, ResponseCreateLinkDto, ResponseUpdateLinkDto } from './dto';
+import { PaginationLinkDto } from './dto/pagination-link.dto';
+import { Query } from '@nestjs/common';
 
 @ApiTags('Links')
 @Controller('links')
@@ -23,6 +25,11 @@ export class LinksController {
     return this.linksService.create(createLinkDto);
   }
 
+  @Get('simple')
+  findOneSimple() {
+    return this.linksService.findOneSimple();
+  }
+
   @Get()
   @ApiOperation({
     summary: 'Get all links',
@@ -31,8 +38,32 @@ export class LinksController {
   @ApiResponse({ status: 200, type: [GetLinksDto] })
   @ApiResponse({ status: 404, type: "Links not found" })
   @ApiResponse({ status: 500, type: "Internal server error" })
-  findAll() {
-    return this.linksService.findAll();
+  findAll(@Query() paginationLinkDto: PaginationLinkDto) {
+    return this.linksService.findAll(paginationLinkDto);
+  }
+
+  @Get('stats/:id')
+  @ApiOperation({
+    summary: 'Get link stats by id',
+    description: 'Get link stats by id',
+  })
+  @ApiResponse({ status: 200, type: GetLinkStatsResponseDto })
+  @ApiResponse({ status: 404, type: "Link not found" })
+  @ApiResponse({ status: 500, type: "Internal server error" })
+  findOneStats(@Param('id') id: string) {
+    return this.linksService.findOneStats(id);
+  }
+
+  @Get('s/:shortCode')
+  @ApiOperation({
+    summary: 'Get link by shortCode',
+    description: 'Get link by shortCode',
+  })
+  @ApiResponse({ status: 200, type: GetLinksDto })
+  @ApiResponse({ status: 404, type: "Link not found" })
+  @ApiResponse({ status: 500, type: "Internal server error" })
+  findOneByShortCode(@Param('shortCode') shortCode: string) {
+    return this.linksService.findOneByShortCode(shortCode);
   }
 
   @Get(':id')

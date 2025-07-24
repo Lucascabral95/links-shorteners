@@ -4,10 +4,16 @@ import { Transform } from "class-transformer";
 import { ApiProperty } from "@nestjs/swagger";
 
 export enum Period {
-    '1h', '12h', '24h', '7d', '30d', '90d', '1y'
+    '1h' = '1h',
+    '12h' = '12h',
+    '24h' = '24h',
+    '7d' = '7d',
+    '30d' = '30d',
+    '90d' = '90d',
+    '1y' = '1y'
 }
 
-enum Type {
+export enum TypePeriod {
     'daily', 'weekly', 'monthly'
 }
 
@@ -19,7 +25,8 @@ export class QueryFilterAnalyticsTopLinksDto {
 
     @ApiProperty()
     @IsEnum(Period)
-    period: Period;
+    @IsOptional()
+    period?: Period;
 
     @ApiProperty()
     @IsNumber()
@@ -30,8 +37,8 @@ export class QueryFilterAnalyticsTopLinksDto {
 
 export class QueryFilterAnalyticsTimeSeriesDto {
     @ApiProperty()
-    @IsEnum(Type)
-    type: Type = Type.daily;
+    @IsEnum(TypePeriod)
+    type: TypePeriod = TypePeriod.daily;
 
     @ApiProperty()
     @IsNumber()

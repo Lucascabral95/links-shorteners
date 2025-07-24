@@ -3,6 +3,11 @@ import { PrismaClient } from 'generated/prisma';
 import { handlePrismaError } from 'src/utils/prisma-error-handler';
 import { CreateLinkDto, UpdateLinkDto } from './dto';
 import { UsersService } from 'src/users/users.service';
+import { PaginationLinkDto } from './dto/pagination-link.dto';
+import { envs } from 'src/config/envs';
+import { WhereGetLinkDto } from './dto/where-get-link-dto';
+
+const LINKS_FILTER_QUANTITY = envs.linksFilterQuantity;
 
 @Injectable()
 export class LinksService extends PrismaClient implements OnModuleInit {
@@ -38,13 +43,91 @@ export class LinksService extends PrismaClient implements OnModuleInit {
     }
   }
 
-  async findAll() {
+  async findAll(paginationLinkDto: PaginationLinkDto) {
     try {
-      const allLinks = await this.link.findMany();
+      const { page = 1, limit = LINKS_FILTER_QUANTITY, search, title, customAlias, isActive, isPublic, userId } = paginationLinkDto;
 
-      return allLinks;
+      const where: WhereGetLinkDto = {}
+
+      if (search) {
+        where.originalUrl = {
+          contains: search,
+          mode: 'insensitive',
+        };
+      }
+
+      if (title) {
+        where.title = {
+          contains: title,
+          mode: 'insensitive',
+        };
+      }
+
+      if (customAlias) {
+        where.customAlias = {
+          contains: customAlias,
+          mode: 'insensitive',
+        };
+      }
+
+      if (isActive !== undefined) {
+        where.isActive = isActive;
+      }
+
+      if (isPublic !== undefined) {
+        where.isPublic = isPublic;
+      }
+
+      if (userId) {
+        where.userId = userId;
+      }
+
+      const [totalLinks, allLinks] = await Promise.all([
+        this.link.count({
+          where: where
+        }),
+        this.link.findMany({
+          where,
+          take: limit,
+          skip: (page - 1) * limit,
+          orderBy: {
+            created_at: 'desc',
+          },
+          include: {
+            clicks: true,
+            user: {
+              select: {
+                id: true,
+                full_name: true,
+                email: true,
+                role: true,
+                verified: true,
+                created_at: true,
+                updated_at: true,
+                googleId: true,
+                picture: true,
+                provider: true,
+              }
+            },
+          }
+        })
+      ])
+
+      const totalPages = Math.ceil(totalLinks / limit);
+
+      return {
+        quantityLinks: totalLinks,
+        totalPages: totalPages,
+        currentPage: page,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+        links: allLinks
+      };
     } catch (error) {
-      throw new handlePrismaError(error, 'Link');
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
+      return handlePrismaError(error, 'Link');
     }
   }
 
@@ -62,8 +145,34 @@ export class LinksService extends PrismaClient implements OnModuleInit {
     }
   }
 
+  async findOneByShortCode(shortCode: string) {
+    try {
+      const link = await this.link.findFirstOrThrow({
+        where: {
+          shortCode: shortCode,
+        }
+      });
+
+      if (!link) {
+        throw new NotFoundException('Link not found');
+      }
+
+      return link;
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new handlePrismaError(error, 'Link', shortCode);
+    }
+  }
+
   async update(id: string, updateLinkDto: UpdateLinkDto) {
     await this.findOne(id);
+
+    const hasFieldsToUpdate = Object.keys(updateLinkDto).length > 0;
+    if (!hasFieldsToUpdate) {
+      throw new BadRequestException('No hay campos para actualizar');
+    }
 
     const { originalUrl, shortCode, customAlias } = updateLinkDto;
 
@@ -184,6 +293,97 @@ export class LinksService extends PrismaClient implements OnModuleInit {
         return null;
       }
       throw new handlePrismaError(error, 'Link');
+    }
+  }
+
+  async findOneSimple() {
+    try {
+
+      const [total, link] = await Promise.all([
+        this.link.count(),
+        this.link.findMany()
+      ])
+
+      return {
+        totalLinks: total,
+        links: link
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new handlePrismaError(error, 'Link');
+    }
+  }
+
+  // Stats of link by id
+  async findOneStats(id: string) {
+    await this.findOne(id);
+
+    try {
+      const link = await this.link.findFirstOrThrow({
+        where: {
+          id: id,
+        },
+        include: {
+          user: true,
+        }
+      });
+
+      const [totalClicks, countries, cities, devices, browsers] = await Promise.all([
+        this.click.count({
+          where: {
+            linkId: id,
+          }
+        }),
+        this.click.groupBy({
+          by: ['country'],
+          _count: {
+            country: true,
+          },
+          where: {
+            linkId: id,
+          },
+        }),
+        this.click.groupBy({
+          by: ['city'],
+          _count: {
+            city: true,
+          },
+          where: {
+            linkId: id,
+          },
+        }),
+        this.click.groupBy({
+          by: ['device'],
+          _count: {
+            device: true,
+          },
+          where: {
+            linkId: id,
+          },
+        }),
+        this.click.groupBy({
+          by: ['browser'],
+          _count: {
+            browser: true,
+          },
+          where: {
+            linkId: id,
+          },
+        })
+      ])
+
+      return {
+        link,
+        totalClicks,
+        countries,
+        cities,
+        devices,
+        browsers,
+      };
+    } catch (error) {
+      throw new handlePrismaError(error, 'Link', id);
     }
   }
 

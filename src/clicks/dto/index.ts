@@ -4,3 +4,5 @@ export * from "./update-click.dto";
 export * from "./create-auto-click.dto";
 export * from "./response-create-auto-click.dto";
 export * from "./response-update-auto-click.dto";
+export * from "./pagination-click.dto";
+export * from "./where-clicks.dto";

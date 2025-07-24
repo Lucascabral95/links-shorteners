@@ -48,19 +48,6 @@ export class AnalyticsController {
     return this.analyticsService.getGeographic()
   }
 
-  @Get('device-browser-distribution')
-  @ApiOperation({
-    summary: 'Get device browser distribution',
-    description: 'Get device and browser usage distribution. Returns statistics including total devices and browsers, unique device types, unique browser types, and device totals with metadata about query results.'
-  })
-  @ApiResponse({ status: 200, type: ResponseDeviceBrowserDistributionDto })
-  @ApiResponse({ status: 400, type: 'Bad Request' })
-  @ApiResponse({ status: 404, type: 'Not Found' })
-  @ApiResponse({ status: 500, type: 'Interval Server Error' })
-  getDeviceBrowserDistribution() {
-    return this.analyticsService.getDeviceBrowserDistribution()
-  }
-
   @Get('conversion-rate')
   @ApiOperation({
     summary: 'Get conversion rate',
