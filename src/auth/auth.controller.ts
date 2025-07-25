@@ -6,7 +6,7 @@ import { envs } from 'src/config/envs';
 import { ApiTags, ApiResponse, ApiOperation } from '@nestjs/swagger';
 import { ResponseRegisterAuthDto } from './dto';
 import { BadRequestException } from '@nestjs/common';
-import { ResponseLoginAuthDto } from './dto/response-login-auth.dto';
+import { ResponseLoginAuthDto } from './dto/response-login-auth.dto'
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -73,25 +73,22 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(GoogleOAuthGuard)
   googleCallback(@Req() req, @Res() res) {
-    try {
-      if (!req.user) {
-        throw new BadRequestException('No Google user data was received');
-      }
+    if (!req.user) throw new BadRequestException('No Google user data was received');
 
-      console.log(req.user.token)
+    const tokenData = req.user.token;
+    const jwtToken =
+      typeof tokenData === 'object'
+        ? tokenData.access_token
+        : tokenData;
 
-      const token = req.user.token;
-      const successUrl = envs.frontendSuccessUrl;
-      const errorUrl = envs.frontendErrorUrl;
-
-      if (!token) {
-        return res.redirect(errorUrl);
-      }
-
-      return res.redirect(`${successUrl}?token=${token}`);
-    } catch (error) {
-      console.error('Error in googleCallback:', error);
-      return res.redirect(envs.loginSessionFailed);
+    if (!jwtToken) {
+      return res.redirect(envs.frontendErrorUrl);
     }
+
+    return res.redirect(
+      `${envs.frontendUrl}/auth/google-callback?accessToken=${encodeURIComponent(jwtToken)}`
+    );
   }
+
+
 }
