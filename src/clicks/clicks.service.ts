@@ -310,4 +310,131 @@ export class ClicksService extends PrismaClient implements OnModuleInit {
       return { country: null, city: null }
     }
   }
+
+  async getClicktatsById(clickId: string) {
+    try {
+      const click = await this.click.findFirstOrThrow({
+        where: {
+          id: clickId
+        },
+        include: {
+          link: {
+            select: {
+              id: true,
+              shortCode: true,
+              originalUrl: true,
+              title: true,
+              customAlias: true,
+              description: true,
+              expiresAt: true,
+              isActive: true,
+              isPublic: true,
+              category: true,
+              created_at: true,
+              updated_at: true,
+            }
+          },
+          user: {
+            select: {
+              id: true,
+              full_name: true,
+              email: true,
+            }
+          }
+        }
+      });
+
+      const [totalClicks, clicks, byCountry, byCity, byDevice, byBrowser, timeSeries] = await Promise.all([
+        this.click.count({
+          where: {
+            linkId: click.linkId
+          }
+        }),
+        this.click.findMany({
+          where: {
+            linkId: click.linkId,
+          },
+          orderBy: {
+            created_at: 'desc'
+          }
+        }),
+        this.click.groupBy({
+          by: ['country'],
+          where: {
+            linkId: click.linkId
+          },
+          _count: {
+            country: true
+          },
+          orderBy: { _count: { country: 'desc' } },
+          take: 5
+        }),
+        this.click.groupBy({
+          by: ['city'],
+          where: {
+            linkId: click.linkId
+          },
+          _count: {
+            city: true
+          },
+          orderBy: { _count: { city: 'desc' } },
+          take: 5
+        }),
+        this.click.groupBy({
+          by: ['device'],
+          where: {
+            linkId: click.linkId
+          },
+          _count: {
+            device: true
+          },
+          orderBy: { _count: { device: 'desc' } }
+        }),
+        this.click.groupBy({
+          by: ['browser'],
+          where: {
+            linkId: click.linkId
+          },
+          _count: {
+            browser: true
+          },
+          orderBy: { _count: { browser: 'desc' } }
+        }),
+        this.click.groupBy({
+          by: ['created_at'],
+          where: {
+            linkId: click.linkId,
+            created_at: {
+              gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+            }
+          },
+          _count: {
+            created_at: true
+          },
+          orderBy: { created_at: 'asc' }
+        })
+      ]);
+
+      return {
+        click: click,
+        totalClicks,
+        metrics: {
+          byCountry: byCountry.map(c => ({ country: c.country, count: c._count.country })),
+          byCity: byCity.map(c => ({ city: c.city, count: c._count.city })),
+          byDevice: byDevice.map(d => ({ device: d.device, count: d._count.device })),
+          byBrowser: byBrowser.map(b => ({ browser: b.browser, count: b._count.browser })),
+          timeSeries: timeSeries.map(t => ({
+            date: t.created_at,
+            count: t._count.created_at
+          }))
+        },
+        clicks: clicks.slice(0, 20)
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
+      return handlePrismaError(error, 'Click', clickId);
+    }
+  }
 }

@@ -5,6 +5,7 @@ import { UseGuards } from '@nestjs/common';
 import { JwtGuard } from '../auth/guards/jwt-guard.guard';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { GetUserDto } from './dto';
+import { GetResponseQuantityResourceByIdDto } from './dto/get-response-quantity-resource-by-id.dto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -29,7 +30,7 @@ export class UsersController {
     summary: 'Get quantity of resources by user',
     description: 'Get quantity of links and clicks by user',
   })
-  // @ApiResponse({ status: 200, type: { links: number, clicks: number } })
+  @ApiResponse({ status: 200, type: GetResponseQuantityResourceByIdDto })
   @ApiResponse({ status: 404, type: "User not found" })
   @ApiResponse({ status: 500, type: "Internal server error" })
   findQuantityResourceUser(@Param('id') id: string) {

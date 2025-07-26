@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Req, Query } from '@nestjs/common';
 import { ClicksService } from './clicks.service';
-import { UpdateClickDto, CreateAutoClickDto, ResponseCreateAutoClickDto, GetClicksDto, ResponseUpdateAutoClickDto, PaginationClickDto } from './dto';
+import { UpdateClickDto, CreateAutoClickDto, ResponseCreateAutoClickDto, GetClicksDto, ResponseUpdateAutoClickDto, PaginationClickDto, GetClickStatsByIdResponseDto } from './dto';
 import { Request } from 'express';
 import { ApiResponse, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
@@ -33,6 +33,18 @@ export class ClicksController {
   @ApiResponse({ status: 500, type: "Internal Server Error" })
   findAll(@Query() paginationClickDto: PaginationClickDto) {
     return this.clicksService.findAll(paginationClickDto);
+  }
+
+  @Get('stats/:id')
+  @ApiOperation({
+    summary: 'Get link stats by id',
+    description: 'Get link stats by id',
+  })
+  @ApiResponse({ status: 200, type: GetClickStatsByIdResponseDto })
+  @ApiResponse({ status: 404, type: "Link not found" })
+  @ApiResponse({ status: 500, type: "Internal server error" })
+  findOneStats(@Param('id') id: string) {
+    return this.clicksService.getClicktatsById(id);
   }
 
   @Get(':linkId')
