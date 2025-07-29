@@ -38,6 +38,11 @@ export class RegisterAuthDto {
     @ApiProperty()
     @IsString()
     @IsOptional()
+    provider?: string;
+
+    @ApiProperty()
+    @IsString()
+    @IsOptional()
     googleId?: string;
 
     @ApiProperty()

@@ -8,4 +8,4 @@ export * from "./login-google.dto";
 export * from "./response-register-auth.dto";
 export * from "./response-login-auth.dto";
 export * from "./response-login-google.dto";
-
+export * from "./register-auth-auto.dto";

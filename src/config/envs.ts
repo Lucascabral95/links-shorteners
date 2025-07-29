@@ -22,6 +22,9 @@ interface EnvVars {
     LOGIN_SESSION_FAILED: string,
     FRONTEND_SUCCESS_URL: string,
     FRONTEND_ERROR_URL: string,
+    URL_GEOLOCATION: string,
+    NODE_ENV: string,
+    URL_GEOLOCATION_DEVELOPMENT: string,
 }
 
 const envsSchema = joi.object<EnvVars>({
@@ -45,6 +48,9 @@ const envsSchema = joi.object<EnvVars>({
     LOGIN_SESSION_FAILED: joi.string().required(),
     FRONTEND_SUCCESS_URL: joi.string().required(),
     FRONTEND_ERROR_URL: joi.string().required(),
+    URL_GEOLOCATION: joi.string().required(),
+    NODE_ENV: joi.string().required(),
+    URL_GEOLOCATION_DEVELOPMENT: joi.string().required(),
 }).unknown(true);
 
 const { value, error } = envsSchema.validate({
@@ -76,4 +82,7 @@ export const envs = {
     loginSessionFailed: value.LOGIN_SESSION_FAILED,
     frontendSuccessUrl: value.FRONTEND_SUCCESS_URL,
     frontendErrorUrl: value.FRONTEND_ERROR_URL,
+    urlGeolocation: value.URL_GEOLOCATION,
+    nodeEnv: value.NODE_ENV,
+    urlGeolocationDevelopment: value.URL_GEOLOCATION_DEVELOPMENT,
 };

@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
-import { CreateClickDto, PaginationClickDto, UpdateClickDto, WhereClicksDto } from './dto';
+import { CreateClickDto, GetResponseAPIGeolocation, PaginationClickDto, UpdateClickDto, WhereClicksDto } from './dto';
 import { PrismaClient } from 'generated/prisma';
 import { handlePrismaError } from 'src/utils/prisma-error-handler';
 import { LinksService } from 'src/links/links.service';
@@ -8,15 +8,28 @@ import { Request } from 'express';
 import { UAParser } from 'ua-parser-js';
 import axios from 'axios';
 import { envs } from 'src/config/envs';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
+import { Devices, Browsers, Agents } from './dto';
 
 const LINKS_FILTER_QUANTITY = envs.linksFilterQuantity;
+const API_LOCATION = envs.urlGeolocation;
+const API_LOCATION_DEVELOPMENT = envs.urlGeolocationDevelopment;
+const NODE_ENV = envs.nodeEnv;
+const LIST_DEVICES = Devices;
+const LIST_BROWSERS = Browsers;
+const LIST_AGENTS = Agents;
 
 @Injectable()
 export class ClicksService extends PrismaClient implements OnModuleInit {
 
   private readonly logger = new Logger(ClicksService.name);
 
-  constructor(private readonly linksService: LinksService, private readonly usersService: UsersService) {
+  constructor(
+    private readonly linksService: LinksService,
+    private readonly usersService: UsersService,
+    private readonly httpService: HttpService
+  ) {
     super();
   }
 
@@ -208,7 +221,7 @@ export class ClicksService extends PrismaClient implements OnModuleInit {
 
   async create(createClickDto: CreateClickDto) {
     await this.linksService.findOne(createClickDto.linkId);
-    await this.usersService.findOne(createClickDto.userId);
+    // await this.usersService.findOne(createClickDto.userId);
 
     try {
       const newClick = await this.click.create({
@@ -435,6 +448,67 @@ export class ClicksService extends PrismaClient implements OnModuleInit {
         throw error;
       }
       return handlePrismaError(error, 'Click', clickId);
+    }
+  }
+
+  /////////////
+  async getHeaderRequestData(ip: Request, userAgent: string, linkid: string) {
+
+    if (!linkid) {
+      throw new BadRequestException('Link ID is required');
+    }
+
+    await this.linksService.findOne(linkid);
+
+    try {
+      const isDevelopment = NODE_ENV === 'development';
+      const isLocalhost = ip.ip === '::1' || ip.ip === '127.0.0.1';
+      let apiUrl = isDevelopment ? API_LOCATION_DEVELOPMENT : API_LOCATION;
+
+      if (isDevelopment && isLocalhost) {
+        console.log('Usando IP pública automática para localhost');
+      } else {
+        apiUrl += `&ip=${ip.ip}`;
+      }
+
+      const device = LIST_DEVICES.find(d => d.toLowerCase() === userAgent.toLowerCase()) || "Desktop";
+      const browser = LIST_BROWSERS.find(b => b.toLowerCase() === userAgent.toLowerCase()) || "Chrome";
+      const agent = LIST_AGENTS.find(a => a.toLowerCase() === userAgent.toLowerCase()) || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+      const agentPart = agent.split(" ")
+
+      const { data } = await firstValueFrom(
+        this.httpService.get(apiUrl)
+      );
+
+      try {
+        await this.create({
+          linkId: linkid,
+          ipAddress: ip.ip || '0.0.0.0',
+          userAgent: agentPart[0],
+          device: device,
+          browser: browser,
+          country: data?.location?.city || 'unknown',
+          city: data?.location?.country_name || 'unknown',
+        });
+
+      } catch (error) {
+        if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof Error) {
+          throw error;
+        }
+        return handlePrismaError(error, 'Click');
+      }
+
+      return {
+        device: device,
+        browser: browser,
+        country: data?.location?.city || null,
+        city: data?.location?.country_name || null,
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof Error) {
+        throw error;
+      }
+      return handlePrismaError(error, 'Click');
     }
   }
 }

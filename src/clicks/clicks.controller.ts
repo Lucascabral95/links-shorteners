@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Req, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Req, Query, Headers } from '@nestjs/common';
 import { ClicksService } from './clicks.service';
 import { UpdateClickDto, CreateAutoClickDto, ResponseCreateAutoClickDto, GetClicksDto, ResponseUpdateAutoClickDto, PaginationClickDto, GetClickStatsByIdResponseDto } from './dto';
 import { Request } from 'express';
@@ -33,6 +33,12 @@ export class ClicksController {
   @ApiResponse({ status: 500, type: "Internal Server Error" })
   findAll(@Query() paginationClickDto: PaginationClickDto) {
     return this.clicksService.findAll(paginationClickDto);
+  }
+
+  @Get('request/data')
+  getHeaderRequestData(@Req() req: Request, @Headers('user-agent') userAgent: string,
+    @Query('linkid') linkid: string) {
+    return this.clicksService.getHeaderRequestData(req, userAgent, linkid);
   }
 
   @Get('stats/:id')

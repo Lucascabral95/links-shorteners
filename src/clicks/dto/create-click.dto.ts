@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from "class-validator";
+import { IsDate, IsOptional, IsString } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 
 export class CreateClickDto {
@@ -8,7 +8,8 @@ export class CreateClickDto {
 
     @ApiProperty()
     @IsString()
-    userId: string;
+    @IsOptional()
+    userId?: string;
 
     @ApiProperty()
     @IsString()
@@ -37,4 +38,14 @@ export class CreateClickDto {
     @IsString()
     @IsOptional()
     browser?: string;
+
+    @ApiProperty()
+    @IsDate()
+    @IsOptional()
+    created_at?: Date;
+
+    @ApiProperty()
+    @IsDate()
+    @IsOptional()
+    updated_at?: Date;
 }
