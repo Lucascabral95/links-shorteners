@@ -21,10 +21,11 @@ model User {
   googleId String?
   picture String?
   provider String @default("email")
-
   links Link[]
-  clicks Click[]
+  clicks Click[] @relation("UserClicks")
   passwordResetToken PasswordResetToken[]
+
+  @@map("users")
 }
 
 model Link {
@@ -41,11 +42,13 @@ model Link {
   category String? 
 
   userId String 
-  user User @relation(fields: [userId], references: [id])
-  clicks Click[]
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clicks Click[] @relation("LinkClicks")
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  @@map("links")
 }
 
 model Click {
@@ -58,24 +61,25 @@ model Click {
   city String?
   device String? 
   browser String?
-  
-  link Link @relation(fields: [linkId], references: [id])
-  user User? @relation(fields: [userId], references: [id])
+  link Link @relation("LinkClicks", fields: [linkId], references: [id], onDelete: Cascade)
+  user User? @relation("UserClicks", fields: [userId], references: [id], onDelete: SetNull)
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  @@map("clicks")
 }
 
-// Change password 
 model PasswordResetToken {
   id String @id @default(cuid())
   token String @unique
   userId String 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   used Boolean @default(false)
-
   created_at DateTime @default(now())
+
+  @@map("password_reset_tokens")
 }
 
 enum Role {

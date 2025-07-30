@@ -9,7 +9,7 @@ export class CreateClickDto {
     @ApiProperty()
     @IsString()
     @IsOptional()
-    userId?: string;
+    userId?: string | null;
 
     @ApiProperty()
     @IsString()

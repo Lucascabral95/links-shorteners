@@ -1,4 +1,3 @@
-
 import { NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 
 export function handlePrismaError(error: any, entityName: string, id?: string) {

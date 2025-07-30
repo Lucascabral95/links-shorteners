@@ -36,9 +36,9 @@ export class ClicksController {
   }
 
   @Get('request/data')
-  getHeaderRequestData(@Req() req: Request, @Headers('user-agent') userAgent: string,
-    @Query('linkid') linkid: string) {
-    return this.clicksService.getHeaderRequestData(req, userAgent, linkid);
+  getHeaderRequestData(@Req() ip: Request, @Headers('user-agent') userAgent: string,
+    @Query('linkid') linkid: string, @Query('uid') uid?: string) {
+    return this.clicksService.getHeaderRequestData(ip, userAgent, linkid, uid);
   }
 
   @Get('stats/:id')

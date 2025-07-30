@@ -220,6 +220,11 @@ export class ClicksService extends PrismaClient implements OnModuleInit {
   }
 
   async create(createClickDto: CreateClickDto) {
+
+    if (createClickDto.userId) {
+      await this.usersService.findOne(createClickDto.userId);
+    }
+
     await this.linksService.findOne(createClickDto.linkId);
     // await this.usersService.findOne(createClickDto.userId);
 
@@ -452,13 +457,18 @@ export class ClicksService extends PrismaClient implements OnModuleInit {
   }
 
   /////////////
-  async getHeaderRequestData(ip: Request, userAgent: string, linkid: string) {
+  async getHeaderRequestData(ip: Request, userAgent: string, linkid: string, uid?: string) {
 
     if (!linkid) {
       throw new BadRequestException('Link ID is required');
     }
 
     await this.linksService.findOne(linkid);
+
+    console.log(`User Agent: ${userAgent}`);
+    console.log(`IP: ${ip.ip}`);
+    console.log(`Link ID: ${linkid}`);
+    console.log(`User ID: ${uid}`);
 
     try {
       const isDevelopment = NODE_ENV === 'development';
@@ -489,6 +499,7 @@ export class ClicksService extends PrismaClient implements OnModuleInit {
           browser: browser,
           country: data?.location?.city || 'unknown',
           city: data?.location?.country_name || 'unknown',
+          userId: uid || null,
         });
 
       } catch (error) {
