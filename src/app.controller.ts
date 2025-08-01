@@ -7,7 +7,6 @@ import { Roles } from './auth/decorators/roles.decorator';
 import { Role } from 'generated/prisma';
 
 @Controller()
-@UseGuards(JwtAdminGuard)
 export class AppController {
   constructor(private readonly appService: AppService) { }
 
@@ -25,6 +24,7 @@ export class AppController {
     return this.appService.healthCheck();
   }
 
+  @UseGuards(JwtAdminGuard)
   @Get('seed/global/generate')
   @Roles(Role.ADMIN)
   @ApiResponse({ status: 200, type: String })
