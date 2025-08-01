@@ -1,15 +1,16 @@
-import { Controller, Get, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
 import { GetUserStatsDto, PaginationUserDto, ResponseUpdateUserDto, UpdateUserDto } from './dto';
 import { UsersService } from './users.service';
-import { UseGuards } from '@nestjs/common';
-import { JwtGuard } from '../auth/guards/jwt-guard.guard';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { GetUserDto } from './dto';
 import { GetResponseQuantityResourceByIdDto } from './dto/get-response-quantity-resource-by-id.dto';
+import { JwtAdminGuard } from 'src/auth/guards/jwt-admin-guard.guard';
+import { Role } from 'generated/prisma';
+import { Roles } from 'src/auth/decorators/roles.decorator';
 
 @ApiTags('Users')
 @Controller('users')
-// @UseGuards(JwtGuard)
+@UseGuards(JwtAdminGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) { }
 
@@ -18,6 +19,7 @@ export class UsersController {
     summary: 'Get all users',
     description: 'Get all users with their respective information such as id, email, full name, role, verified status, created and updated at dates, googleId, picture, provider, links and clicks',
   })
+  @Roles(Role.ADMIN)
   @ApiResponse({ status: 200, type: [GetUserDto] })
   @ApiResponse({ status: 404, type: "Users not found" })
   @ApiResponse({ status: 500, type: "Internal server error" })
@@ -78,6 +80,7 @@ export class UsersController {
     summary: 'Delete user by id',
     description: 'Delete user by id',
   })
+  @Roles(Role.ADMIN)
   @ApiResponse({ status: 200, type: "User deleted successfully" })
   @ApiResponse({ status: 404, type: "User not found" })
   @ApiResponse({ status: 500, type: "Internal server error" })

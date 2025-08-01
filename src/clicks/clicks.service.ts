@@ -457,18 +457,19 @@ export class ClicksService extends PrismaClient implements OnModuleInit {
   }
 
   /////////////
-  async getHeaderRequestData(ip: Request, userAgent: string, linkid: string, uid?: string) {
+  async getHeaderRequestData(ip: Request, userAgent: string, short: string, uid?: string) {
 
-    if (!linkid) {
-      throw new BadRequestException('Link ID is required');
+    if (!short) {
+      throw new BadRequestException('Short code is required');
     }
 
-    await this.linksService.findOne(linkid);
+    await this.linksService.findOneByShortCode(short);
 
-    console.log(`User Agent: ${userAgent}`);
-    console.log(`IP: ${ip.ip}`);
-    console.log(`Link ID: ${linkid}`);
-    console.log(`User ID: ${uid}`);
+    const link = await this.link.findFirstOrThrow({
+      where: {
+        shortCode: short,
+      },
+    })
 
     try {
       const isDevelopment = NODE_ENV === 'development';
@@ -492,7 +493,7 @@ export class ClicksService extends PrismaClient implements OnModuleInit {
 
       try {
         await this.create({
-          linkId: linkid,
+          linkId: link.id,
           ipAddress: ip.ip || '0.0.0.0',
           userAgent: agentPart[0],
           device: device,
@@ -512,8 +513,8 @@ export class ClicksService extends PrismaClient implements OnModuleInit {
       return {
         device: device,
         browser: browser,
-        country: data?.location?.city || null,
-        city: data?.location?.country_name || null,
+        country: data?.location?.country_name || null,
+        city: data?.location?.city || null,
       };
     } catch (error) {
       if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof Error) {

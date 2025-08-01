@@ -3,9 +3,11 @@ import { LinksService } from './links.service';
 import { CreateLinkDto } from './dto/create-link.dto';
 import { UpdateLinkDto } from './dto/update-link.dto';
 import { ApiTags, ApiResponse, ApiOperation } from '@nestjs/swagger';
-import { GetLinksDto, GetLinkStatsResponseDto, ResponseCreateLinkDto, ResponseUpdateLinkDto } from './dto';
+import { GetLinksDto, GetLinkStatsResponseDto, ResponseCreateLinkDto, ResponseUpdateLinkDto, VerifyPasswordLinkDto } from './dto';
 import { PaginationLinkDto } from './dto/pagination-link.dto';
 import { Query } from '@nestjs/common';
+import { JwtAdminGuard } from 'src/auth/guards/jwt-admin-guard.guard';
+import { UseGuards } from '@nestjs/common';
 
 @ApiTags('Links')
 @Controller('links')
@@ -13,6 +15,7 @@ export class LinksController {
   constructor(private readonly linksService: LinksService) { }
 
   @Post()
+  @UseGuards(JwtAdminGuard)
   @ApiOperation({
     summary: 'Create link',
     description: 'Create link with originalUrl, shortCode, category, userId, customAlias, title, description, password, isPublic, isActive and expiresAt',
@@ -26,11 +29,13 @@ export class LinksController {
   }
 
   @Get('simple')
+  @UseGuards(JwtAdminGuard)
   findOneSimple() {
     return this.linksService.findOneSimple();
   }
 
   @Get()
+  @UseGuards(JwtAdminGuard)
   @ApiOperation({
     summary: 'Get all links',
     description: 'Get all links created with all their clicks information',
@@ -42,7 +47,20 @@ export class LinksController {
     return this.linksService.findAll(paginationLinkDto);
   }
 
+  /////////////////
+  @Get('password/:short')
+  verifyHavePassword(@Param('short') short: string) {
+    return this.linksService.verifyHavePassword(short);
+  }
+
+  @Post('password/:short')
+  verifyPassword(@Param('short') short: string, @Body() verifyPasswordLinkDto: VerifyPasswordLinkDto) {
+    return this.linksService.verifyPassword(short, verifyPasswordLinkDto);
+  }
+  /////////////////
+
   @Get('stats/:id')
+  @UseGuards(JwtAdminGuard)
   @ApiOperation({
     summary: 'Get link stats by id',
     description: 'Get link stats by id',
@@ -55,6 +73,7 @@ export class LinksController {
   }
 
   @Get('s/:shortCode')
+  @UseGuards(JwtAdminGuard)
   @ApiOperation({
     summary: 'Get link by shortCode',
     description: 'Get link by shortCode',
@@ -67,6 +86,7 @@ export class LinksController {
   }
 
   @Get(':id')
+  @UseGuards(JwtAdminGuard)
   @ApiOperation({
     summary: 'Get link by id',
     description: 'Get link by id',
@@ -79,6 +99,7 @@ export class LinksController {
   }
 
   @Patch(':id')
+  @UseGuards(JwtAdminGuard)
   @ApiOperation({
     summary: 'Update link by id',
     description: 'Update link by id for the following fields: userId, originalUrl, shortCode, customAlias, title, description, password, expiresAt, isActive, isPublic, category',
@@ -91,6 +112,7 @@ export class LinksController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAdminGuard)
   @ApiOperation({
     summary: 'Delete link by id',
     description: 'Delete link by id',

@@ -89,6 +89,4 @@ export class AuthController {
       `${envs.frontendUrl}/auth/google-callback?accessToken=${encodeURIComponent(jwtToken)}`
     );
   }
-
-
 }

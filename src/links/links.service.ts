@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaClient } from 'generated/prisma';
 import { handlePrismaError } from 'src/utils/prisma-error-handler';
-import { CreateLinkDto, UpdateLinkDto } from './dto';
+import { CreateLinkDto, UpdateLinkDto, VerifyPasswordLinkDto } from './dto';
 import { UsersService } from 'src/users/users.service';
 import { PaginationLinkDto } from './dto/pagination-link.dto';
 import { envs } from 'src/config/envs';
@@ -298,7 +298,6 @@ export class LinksService extends PrismaClient implements OnModuleInit {
 
   async findOneSimple() {
     try {
-
       const [total, link] = await Promise.all([
         this.link.count(),
         this.link.findMany()
@@ -387,4 +386,68 @@ export class LinksService extends PrismaClient implements OnModuleInit {
     }
   }
 
+  // VerifyPassword 
+  async verifyHavePassword(shortCode: string) {
+    await this.findOneByShortCode(shortCode)
+
+    try {
+      const link = await this.link.findFirstOrThrow({
+        where: {
+          shortCode: shortCode,
+        },
+      })
+
+      if (!link.password) {
+        throw new BadRequestException('Link does not have a password');
+      }
+
+      return {
+        status: 200,
+        message: 'Link password verified successfully',
+        data: {
+          verified: true,
+          link: link.title
+        }
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new handlePrismaError(error, 'Link', shortCode);
+    }
+  }
+
+  async verifyPassword(shortCode: string, verifyPasswordLinkDto: VerifyPasswordLinkDto) {
+    await this.findOneByShortCode(shortCode)
+
+    try {
+      const link = await this.link.findFirstOrThrow({
+        where: {
+          shortCode: shortCode,
+        },
+      })
+
+      if (!link.password) {
+        throw new BadRequestException('Link does not have a password');
+      }
+
+      if (link.password !== verifyPasswordLinkDto.password) {
+        throw new BadRequestException('Invalid password');
+      }
+
+      return {
+        status: 200,
+        message: 'Link password verified successfully',
+        data: {
+          verified: true,
+          link: link.title
+        }
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new handlePrismaError(error, 'Link', shortCode);
+    }
+  }
 }
