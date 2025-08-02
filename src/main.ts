@@ -2,9 +2,11 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { EXCLUDED_ROUTES_DETAILED } from './config/routes.config';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -14,12 +16,16 @@ async function bootstrap() {
     })
   );
 
+  app.set('trust proxy', true);
+
   app.enableCors({
     origin: true,
     credentials: true,
   });
 
-  app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix('api/v1', {
+    exclude: EXCLUDED_ROUTES_DETAILED,
+  });
 
   const config = new DocumentBuilder()
     .setTitle('Links Shortener API')

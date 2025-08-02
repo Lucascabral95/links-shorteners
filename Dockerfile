@@ -29,4 +29,6 @@ USER nextjs
 
 EXPOSE 4000
 
+# ✅ Ejecutar estas migraciones en el contenedor solo si hay problemas con la neon DDBB 
+#CMD ["sh", "-c", "npx prisma migrate deploy && npm run start:prod"]
 CMD ["npm", "run", "start:prod"]

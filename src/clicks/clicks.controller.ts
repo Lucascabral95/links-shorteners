@@ -42,7 +42,6 @@ export class ClicksController {
   }
 
   @Get('request/data')
-  @UseGuards(JwtAdminGuard)
   @ApiOperation({
     summary: 'Get click data by request',
     description: 'Get click data by request',

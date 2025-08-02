@@ -1,8 +1,7 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
 import { AppService } from './app.service';
 import { ApiResponse } from '@nestjs/swagger';
 import { JwtAdminGuard } from 'src/auth/guards/jwt-admin-guard.guard';
-import { UseGuards } from '@nestjs/common';
 import { Roles } from './auth/decorators/roles.decorator';
 import { Role } from 'generated/prisma';
 
@@ -31,5 +30,14 @@ export class AppController {
   @ApiResponse({ status: 500, type: String })
   generateGlobalSeed() {
     return this.appService.generateGlobalSeed();
+  }
+
+  @UseGuards(JwtAdminGuard)
+  @Get('seed/global/generate')
+  @Roles(Role.ADMIN)
+  @ApiResponse({ status: 200, type: String })
+  @ApiResponse({ status: 500, type: String })
+  generateGlobalSeedProduction() {
+    return this.appService.generateGlobalSeedProduction();
   }
 }

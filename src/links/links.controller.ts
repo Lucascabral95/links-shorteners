@@ -73,7 +73,6 @@ export class LinksController {
   }
 
   @Get('s/:shortCode')
-  @UseGuards(JwtAdminGuard)
   @ApiOperation({
     summary: 'Get link by shortCode',
     description: 'Get link by shortCode',

@@ -9,7 +9,7 @@ import { UAParser } from 'ua-parser-js';
 import axios from 'axios';
 import { envs } from 'src/config/envs';
 import { HttpService } from '@nestjs/axios';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 import { Devices, Browsers, Agents } from './dto';
 
 const LINKS_FILTER_QUANTITY = envs.linksFilterQuantity;
@@ -458,69 +458,138 @@ export class ClicksService extends PrismaClient implements OnModuleInit {
 
   /////////////
   async getHeaderRequestData(ip: Request, userAgent: string, short: string, uid?: string) {
-
     if (!short) {
       throw new BadRequestException('Short code is required');
     }
 
     await this.linksService.findOneByShortCode(short);
-
     const link = await this.link.findFirstOrThrow({
-      where: {
-        shortCode: short,
-      },
-    })
+      where: { shortCode: short },
+    });
 
     try {
-      const isDevelopment = NODE_ENV === 'development';
-      const isLocalhost = ip.ip === '::1' || ip.ip === '127.0.0.1';
-      let apiUrl = isDevelopment ? API_LOCATION_DEVELOPMENT : API_LOCATION;
+      let clientIP = '0.0.0.0';
+      let geoData = { location: { country_name: 'Unknown', city: 'Unknown' } };
+      try {
+        const { data: ipData } = await firstValueFrom(
+          this.httpService.get('https://api.ipify.org?format=json').pipe(timeout(3000))
+        );
 
-      if (isDevelopment && isLocalhost) {
-        console.log('Usando IP pública automática para localhost');
-      } else {
-        apiUrl += `&ip=${ip.ip}`;
+        if (ipData?.ip && !this.isPrivateIP(ipData.ip)) {
+          clientIP = ipData.ip;
+          console.log('🌐 IP real obtenida via API externa:', clientIP);
+
+          const isDevelopment = NODE_ENV === 'development';
+          const apiUrl = isDevelopment ? API_LOCATION_DEVELOPMENT : API_LOCATION;
+
+          const { data } = await firstValueFrom(
+            this.httpService.get<GetResponseAPIGeolocation>(`${apiUrl}&ip=${clientIP}`).pipe(timeout(5000))
+          );
+          geoData = data;
+          console.log('✅ Geolocalización exitosa:', geoData?.location);
+        }
+      } catch (error) {
+        console.log('⚠️ API externa falló, intentando con headers locales');
+
+        clientIP = this.getClientIPP(ip);
+
+        if (!this.isPrivateIP(clientIP)) {
+          try {
+            const isDevelopment = NODE_ENV === 'development';
+            const apiUrl = isDevelopment ? API_LOCATION_DEVELOPMENT : API_LOCATION;
+
+            const { data } = await firstValueFrom(
+              this.httpService.get<GetResponseAPIGeolocation>(`${apiUrl}&ip=${clientIP}`)
+            );
+            geoData = data;
+          } catch (geoError) {
+            console.log('⚠️ Geolocalización falló, usando datos por defecto');
+            geoData = {
+              location: {
+                country_name: 'Argentina',
+                city: 'Buenos Aires'
+              }
+            };
+          }
+        } else {
+          console.log('ℹ️ IP privada detectada, usando ubicación por defecto');
+          geoData = {
+            location: {
+              country_name: 'Local',
+              city: 'Local'
+            }
+          };
+        }
       }
 
       const device = LIST_DEVICES.find(d => d.toLowerCase() === userAgent.toLowerCase()) || "Desktop";
       const browser = LIST_BROWSERS.find(b => b.toLowerCase() === userAgent.toLowerCase()) || "Chrome";
-      const agent = LIST_AGENTS.find(a => a.toLowerCase() === userAgent.toLowerCase()) || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
-      const agentPart = agent.split(" ")
+      const agent = LIST_AGENTS.find(a => a.toLowerCase() === userAgent.toLowerCase()) || "Mozilla/5.0";
+      const agentPart = typeof agent === 'string' ? agent.split(" ") : [agent[0] || ''];
 
-      const { data } = await firstValueFrom(
-        this.httpService.get(apiUrl)
-      );
+      await this.create({
+        linkId: link.id,
+        ipAddress: clientIP,
+        userAgent: agentPart[0],
+        device: device,
+        browser: browser,
+        country: geoData?.location?.country_name || 'unknown',
+        city: geoData?.location?.city || 'unknown',
+        userId: uid || null,
+      });
 
-      try {
-        await this.create({
-          linkId: link.id,
-          ipAddress: ip.ip || '0.0.0.0',
-          userAgent: agentPart[0],
-          device: device,
-          browser: browser,
-          country: data?.location?.city || 'unknown',
-          city: data?.location?.country_name || 'unknown',
-          userId: uid || null,
-        });
-
-      } catch (error) {
-        if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof Error) {
-          throw error;
-        }
-        return handlePrismaError(error, 'Click');
-      }
+      console.log('✅ Click registrado con datos de ubicación');
 
       return {
         device: device,
         browser: browser,
-        country: data?.location?.country_name || null,
-        city: data?.location?.city || null,
+        country: geoData?.location?.country_name || null,
+        city: geoData?.location?.city || null,
       };
+
     } catch (error) {
-      if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof Error) {
+      console.error('🔴 Error in getHeaderRequestData:', error);
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
         throw error;
       }
       return handlePrismaError(error, 'Click');
     }
+  }
+
+  private getClientIPP(req: Request): string {
+    const forwarded = req.headers['x-forwarded-for'] as string;
+    const realIP = req.headers['x-real-ip'] as string;
+    const cfIP = req.headers['cf-connecting-ip'] as string;
+
+    console.log('📋 Headers disponibles:', {
+      'x-forwarded-for': forwarded,
+      'x-real-ip': realIP,
+      'cf-connecting-ip': cfIP,
+      'req.ip': req.ip
+    });
+
+    if (forwarded) {
+      const ips = forwarded.split(',').map(ip => ip.trim());
+      const publicIP = ips.find(ip => !this.isPrivateIP(ip));
+      if (publicIP) return publicIP;
+    }
+
+    if (realIP && !this.isPrivateIP(realIP)) return realIP;
+    if (cfIP && !this.isPrivateIP(cfIP)) return cfIP;
+
+    return req.ip || req.connection?.remoteAddress || '0.0.0.0';
+  }
+
+  private isPrivateIP(ip: string): boolean {
+    if (!ip) return true;
+
+    const cleanIP = ip.replace(/^::ffff:/, '');
+
+    return cleanIP.startsWith('172.') ||
+      cleanIP.startsWith('192.168.') ||
+      cleanIP.startsWith('10.') ||
+      cleanIP === '127.0.0.1' ||
+      cleanIP === '::1' ||
+      cleanIP === 'localhost';
   }
 }

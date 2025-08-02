@@ -54,7 +54,6 @@ export class AppService extends PrismaClient implements OnModuleInit {
         skipDuplicates: true,
       })
 
-      console.log(`Seeded executed successfully`)
       return 'Seeded executed successfully'
     } catch (error) {
       try {
@@ -76,4 +75,43 @@ export class AppService extends PrismaClient implements OnModuleInit {
     }
   }
 
+  async generateGlobalSeedProduction() {
+    try {
+      await this.click.deleteMany({});
+      await this.link.deleteMany({});
+      await this.user.deleteMany({});
+
+      await this.user.createMany({
+        data: mockUsers.map((u) => ({
+          ...u,
+          password: bcrypt.hashSync(u.password, 10),
+        })),
+        skipDuplicates: true,
+      });
+
+      await this.link.createMany({
+        data: mockLinks,
+        skipDuplicates: true,
+      });
+
+      await this.click.createMany({
+        data: mockClicks,
+        skipDuplicates: true,
+      });
+
+      return 'Seeded executed successfully';
+
+    } catch (error) {
+      console.error('Seed error details:', {
+        code: error.code,
+        message: error.message,
+        meta: error.meta
+      });
+
+      if (error instanceof Error || error instanceof PrismaClientKnownRequestError || error instanceof PrismaClientUnknownRequestError) {
+        throw new handlePrismaError(error, 'generateGlobalSeed');
+      }
+      throw new handlePrismaError(error, 'generateGlobalSeed');
+    }
+  }
 }
